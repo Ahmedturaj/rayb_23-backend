@@ -11,136 +11,7 @@ const Notification = require("../notification/notification.model");
 const { GOOGLE_API_KEY } = require("../../config");
 const axios = require("axios");
 
-// exports.createBusiness = async (req, res) => {
-//   try {
-//     const { email, userType } = req.user;
-//     const {
-//       services,
-//       businessInfo,
-//       businessHours,
-//       longitude,
-//       latitude,
-//       musicLessons,
-//       ...rest
-//     } = req.body;
 
-//     const files = req.files;
-//     const user = await User.findOne({ email });
-//     if (!user) return res.status(404).json({ success: false, error: "User not found" });
-
-//     const ownerField = userType === "admin" ? "adminId" : "user";
-
-//     // ---------- Upload images ----------
-//     let image = [];
-//     if (files && Array.isArray(files) && files.length > 0) {
-//       image = await Promise.all(
-//         files.map(async (file) => {
-//           const imageName = `business/${Date.now()}_${file.originalname}`;
-//           const result = await sendImageToCloudinary(imageName, file.path);
-//           // Clean up uploaded file
-//           fs.unlinkSync(file.path);
-//           return result.secure_url;
-//         })
-//       );
-//     }
-
-//     // ---------- Create Business First ----------
-//     const business = await Business.create({
-//       ...rest,
-//       [ownerField]: user._id,
-//       businessInfo: { ...businessInfo, image },
-//       services,
-//       musicLessons,
-//       businessHours,
-//       longitude,
-//       latitude,
-//     });
-
-//     // ---------- Google Place API ----------
-//     let placeReviews = [];
-//     let placeId = null;
-
-//     try {
-//       // 1️⃣ Find placeId
-//       const searchUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(
-//         businessInfo.name + " " + businessInfo.address
-//       )}&inputtype=textquery&fields=place_id&key=${GOOGLE_API_KEY}`;
-
-//       const searchResponse = await axios.get(searchUrl);
-//       const candidates = searchResponse.data.candidates;
-
-//       if (candidates && candidates.length > 0) {
-//         placeId = candidates[0].place_id;
-
-//         // 2️⃣ Get place details (reviews)
-//         const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,reviews,formatted_address,geometry&key=${GOOGLE_API_KEY}`;
-//         const detailsResponse = await axios.get(detailsUrl);
-//         const placeDetails = detailsResponse.data.result;
-
-//         if (placeDetails.reviews && placeDetails.reviews.length > 0) {
-//           placeReviews = placeDetails.reviews
-//             .slice(0, 5) // Limit to 5 reviews
-//             .map((r) => ({
-//               rating: r.rating,
-//               feedback: r.text || "No feedback",
-//               user: null, // Google reviews have no local user
-//               business: business._id, // Link to the created business
-//               googlePlaceId: placeId,
-//               status: "approved", // Auto-approve Google reviews
-//             }));
-//         }
-//       }
-//     } catch (err) {
-//       console.warn("Google Place fetch failed:", err.message);
-//     }
-
-//     // ---------- Save Google reviews in Review collection ----------
-//     if (placeReviews.length > 0) {
-//       const savedReviews = await ReviewModel.insertMany(placeReviews);
-
-//       // Attach review IDs to business
-//       business.review = savedReviews.map((r) => r._id);
-//       await business.save();
-//     }
-
-//     // ---------- Notifications ----------
-//     const adminUsers = await User.find({ userType: "admin" });
-//     const io = req.app.get("io");
-
-//     for (const admin of adminUsers) {
-//       const notify = await Notification.create({
-//         senderId: user._id,
-//         receiverId: admin._id,
-//         userType: "admin",
-//         type: "new_business_submitted",
-//         title: "New Business Submitted",
-//         message: `${user.name || "A user"} submitted a new business.`,
-//         metadata: { businessId: business._id },
-//       });
-//       io.to(`${admin._id}`).emit("new_notification", notify);
-//     }
-
-//     const notifyUser = await Notification.create({
-//       senderId: user._id,
-//       receiverId: user._id,
-//       userType: userType,
-//       type: "business_submission",
-//       title: "Business Created",
-//       message: `You have successfully created a business.`,
-//       metadata: { businessId: business._id },
-//     });
-//     io.to(`${user._id}`).emit("new_notification", notifyUser);
-
-//     return res.status(201).json({
-//       success: true,
-//       message: "Business created successfully",
-//       business,
-//     });
-//   } catch (error) {
-//     console.error("Create Business Error:", error);
-//     return res.status(500).json({ success: false, error: error.message });
-//   }
-// };
 
 
 exports.createBusiness = async (req, res) => {
@@ -162,10 +33,8 @@ exports.createBusiness = async (req, res) => {
 
     const ownerField = userType === "admin" ? "adminId" : "user";
 
-    // ---------- Upload images ----------
     let image = [];
     if (files && Array.isArray(files) && files.length === 0) {
-      // Handle no files uploaded
       return res.status(400).json({ success: false, message: "No files uploaded" });
     }
     else{
@@ -178,8 +47,6 @@ exports.createBusiness = async (req, res) => {
       })
     );
     }
-
-    // ---------- Create Business ----------
     const business = await Business.create({
       ...rest,
       [ownerField]: user._id,
@@ -191,12 +58,10 @@ exports.createBusiness = async (req, res) => {
       latitude,
     });
 
-    // ---------- Google Place API ----------
     let placeReviews = [];
     let placeId = null;
 
     try {
-      // 1️⃣ Get placeId dynamically using Geocoding API
       const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
         businessInfo.address
       )}&key=${GOOGLE_API_KEY}`;
@@ -209,7 +74,6 @@ exports.createBusiness = async (req, res) => {
       ) {
         placeId = geoResponse.data.results[0].place_id;
 
-        // 2️⃣ Fetch reviews using Place Details API
         const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,user_ratings_total,reviews&key=${GOOGLE_API_KEY}`;
 
         const detailsResponse = await axios.get(detailsUrl);
